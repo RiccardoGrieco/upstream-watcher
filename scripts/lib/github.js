@@ -108,7 +108,7 @@ function createClient(token) {
         if (!pr.merged_at) {
           continue;
         }
-        if (since && (pr.number === since.number || new Date(pr.merged_at) <= new Date(since.mergedAt))) {
+        if (since && (pr.number === since.number || new Date(pr.merged_at) < new Date(since.mergedAt))) {
           stop = true;
           break;
         }
@@ -127,12 +127,25 @@ function createClient(token) {
     return commit.sha;
   }
 
-  async function getLatestMergedPullRequest(repo) {
-    const pulls = await getJson(`/repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=50`);
-    if (!Array.isArray(pulls)) {
-      return null;
+  async function getLatestMergedPullRequest(repo, { maxPages = 5, perPage = 50 } = {}) {
+    let page = 1;
+    while (page <= maxPages) {
+      const pulls = await getJson(
+        `/repos/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=${perPage}&page=${page}`
+      );
+      if (!Array.isArray(pulls) || pulls.length === 0) {
+        break;
+      }
+      const merged = pulls.find((pr) => pr.merged_at);
+      if (merged) {
+        return merged;
+      }
+      if (pulls.length < perPage) {
+        break;
+      }
+      page += 1;
     }
-    return pulls.find((pr) => pr.merged_at) || null;
+    return null;
   }
 
   async function findOpenIssueByTitle(repo, title, labels) {

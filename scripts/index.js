@@ -1,7 +1,7 @@
 'use strict';
 
 const fs = require('fs');
-const { createClient, GitHubApiError } = require('./lib/github');
+const { createClient } = require('./lib/github');
 const { readState, writeState } = require('./lib/state');
 const { notifyIssue, notifySlack } = require('./lib/notify');
 
@@ -142,13 +142,8 @@ async function run(env = process.env) {
 
 if (require.main === module) {
   run().catch((err) => {
-    if (err instanceof GitHubApiError) {
-      // eslint-disable-next-line no-console
-      console.error(`::error::${err.message}`);
-    } else {
-      // eslint-disable-next-line no-console
-      console.error(`::error::${err.message}`);
-    }
+    // eslint-disable-next-line no-console
+    console.error(`::error::${err.message}`);
     process.exitCode = 1;
   });
 }
