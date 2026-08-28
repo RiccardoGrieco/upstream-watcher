@@ -1,0 +1,74 @@
+name: "Upstream Watcher"
+description: >
+  Watch a public GitHub repository you don't own/control for new commits on a branch
+  and newly merged pull requests, polling the GitHub REST API from your own repository.
+author: "RiccardoGrieco"
+branding:
+  icon: "eye"
+  color: "blue"
+
+inputs:
+  upstream-repo:
+    description: "owner/repo of the public repository to watch."
+    required: true
+  branch:
+    description: "Branch on the upstream repo to watch for new commits."
+    required: false
+    default: "main"
+  github-token:
+    description: >
+      Token used for GitHub API calls. Works with unauthenticated public API access too,
+      but pass one (e.g. secrets.GITHUB_TOKEN) for higher rate limits and issue creation.
+    required: true
+  state-path:
+    description: "Path in the consumer repo used to persist last-seen commit SHA / PR."
+    required: false
+    default: ".github/upstream-watcher-state.json"
+  check-commits:
+    description: "Whether to check for new commits on the branch."
+    required: false
+    default: "true"
+  check-merged-prs:
+    description: "Whether to check for newly merged pull requests."
+    required: false
+    default: "true"
+  notify-method:
+    description: "Notification method: issue, slack, or none."
+    required: false
+    default: "issue"
+  slack-webhook-url:
+    description: "Slack incoming webhook URL. Required when notify-method is slack."
+    required: false
+    default: ""
+  issue-labels:
+    description: "Comma-separated labels to apply to the created/updated issue."
+    required: false
+    default: "upstream-update"
+
+outputs:
+  new-commits:
+    description: "JSON array of new commit objects (sha, message, author, url) since last check."
+    value: ${{ steps.watch.outputs.new-commits }}
+  new-merged-prs:
+    description: "JSON array of newly merged PR objects (number, title, author, url, merged_at) since last check."
+    value: ${{ steps.watch.outputs.new-merged-prs }}
+  has-updates:
+    description: '"true" or "false" depending on whether new commits/merged PRs were found.'
+    value: ${{ steps.watch.outputs.has-updates }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: watch
+      shell: bash
+      env:
+        INPUT_UPSTREAM_REPO: ${{ inputs.upstream-repo }}
+        INPUT_BRANCH: ${{ inputs.branch }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUT_STATE_PATH: ${{ inputs.state-path }}
+        INPUT_CHECK_COMMITS: ${{ inputs.check-commits }}
+        INPUT_CHECK_MERGED_PRS: ${{ inputs.check-merged-prs }}
+        INPUT_NOTIFY_METHOD: ${{ inputs.notify-method }}
+        INPUT_SLACK_WEBHOOK_URL: ${{ inputs.slack-webhook-url }}
+        INPUT_ISSUE_LABELS: ${{ inputs.issue-labels }}
+      run: node "${{ github.action_path }}/scripts/index.js"

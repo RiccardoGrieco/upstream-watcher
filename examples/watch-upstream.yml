@@ -1,0 +1,53 @@
+name: Watch upstream repository
+
+# Copy this file into your repo (e.g. as .github/workflows/watch-upstream.yml) and
+# adjust the `with:` inputs below to point at the public repository you want to watch.
+#
+# Permissions needed:
+#   - contents: write  -> to commit the updated state file back to this repo
+#   - issues: write    -> only required when notify-method is "issue" (the default)
+
+on:
+  schedule:
+    - cron: "*/30 * * * *" # every 30 minutes
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  watch-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+
+      - name: Watch upstream repository
+        id: watch
+        uses: RiccardoGrieco/upstream-watcher@v1
+        with:
+          upstream-repo: "octocat/Hello-World"
+          branch: main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          state-path: .github/upstream-watcher-state.json
+          check-commits: "true"
+          check-merged-prs: "true"
+          notify-method: issue
+          issue-labels: upstream-update
+          # notify-method: slack
+          # slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Use outputs (optional custom notification step)
+        if: steps.watch.outputs.has-updates == 'true'
+        run: |
+          echo "New commits: ${{ steps.watch.outputs.new-commits }}"
+          echo "New merged PRs: ${{ steps.watch.outputs.new-merged-prs }}"
+
+      - name: Commit updated state file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/upstream-watcher-state.json
+          git diff --cached --quiet || git commit -m "chore: update upstream-watcher state"
+          git push

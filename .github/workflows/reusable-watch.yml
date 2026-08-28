@@ -1,0 +1,79 @@
+name: Reusable upstream watcher
+
+on:
+  workflow_call:
+    inputs:
+      upstream-repo:
+        description: "owner/repo of the public repository to watch."
+        required: true
+        type: string
+      branch:
+        description: "Branch on the upstream repo to watch for new commits."
+        required: false
+        type: string
+        default: "main"
+      state-path:
+        description: "Path in the consumer repo used to persist last-seen commit SHA / PR."
+        required: false
+        type: string
+        default: ".github/upstream-watcher-state.json"
+      check-commits:
+        description: "Whether to check for new commits on the branch."
+        required: false
+        type: string
+        default: "true"
+      check-merged-prs:
+        description: "Whether to check for newly merged pull requests."
+        required: false
+        type: string
+        default: "true"
+      notify-method:
+        description: "Notification method: issue, slack, or none."
+        required: false
+        type: string
+        default: "issue"
+      issue-labels:
+        description: "Comma-separated labels to apply to the created/updated issue."
+        required: false
+        type: string
+        default: "upstream-update"
+    secrets:
+      github-token:
+        description: "Token used for GitHub API calls (defaults to the caller's GITHUB_TOKEN if omitted)."
+        required: false
+      slack-webhook-url:
+        description: "Slack incoming webhook URL. Required when notify-method is slack."
+        required: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+
+      - name: Watch upstream repository
+        id: watch
+        uses: RiccardoGrieco/upstream-watcher@v1
+        with:
+          upstream-repo: ${{ inputs.upstream-repo }}
+          branch: ${{ inputs.branch }}
+          github-token: ${{ secrets.github-token || github.token }}
+          state-path: ${{ inputs.state-path }}
+          check-commits: ${{ inputs.check-commits }}
+          check-merged-prs: ${{ inputs.check-merged-prs }}
+          notify-method: ${{ inputs.notify-method }}
+          slack-webhook-url: ${{ secrets.slack-webhook-url }}
+          issue-labels: ${{ inputs.issue-labels }}
+
+      - name: Commit updated state file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${{ inputs.state-path }}"
+          git diff --cached --quiet || git commit -m "chore: update upstream-watcher state"
+          git push
