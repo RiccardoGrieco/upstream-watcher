@@ -149,7 +149,7 @@ test('merge commit collapses feature-branch commits via first-parent walk', asyn
     if (commitMatch && commitsBySha[commitMatch[1]]) {
       return mockResponse(200, commitsBySha[commitMatch[1]]);
     }
-    if (url.includes('/pulls?state=closed') && !url.includes('per_page=50&page')) {
+    if (url.includes('/pulls?state=closed')) {
       return mockResponse(200, []);
     }
     throw new Error(`unexpected url ${url}`);
@@ -181,7 +181,7 @@ test('notify-method none skips notifications but still reports outputs', async (
     if (commitMatch && commitsBySha[commitMatch[1]]) {
       return mockResponse(200, commitsBySha[commitMatch[1]]);
     }
-    if (url.includes('/pulls?state=closed') && !url.includes('per_page=50&page')) {
+    if (url.includes('/pulls?state=closed')) {
       return mockResponse(200, []);
     }
     if (options.method === 'POST') {
