@@ -1,7 +1,5 @@
 name: "Upstream Watcher"
-description: >
-  Watch a public GitHub repository you don't own/control for new commits on a branch
-  and newly merged pull requests, polling the GitHub REST API from your own repository.
+description: "Watch a public GitHub repo for new commits and merged PRs, and be notified."
 author: "RiccardoGrieco"
 branding:
   icon: "eye"
