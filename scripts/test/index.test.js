@@ -77,13 +77,16 @@ test('subsequent run reports new commits and merged PRs, and creates an issue', 
 
   let issueCreated = null;
 
+  const commitsBySha = {
+    main: { sha: 'newsha2222222', commit: { message: 'second\nbody' }, author: { login: 'bob' }, html_url: 'https://example.com/2', parents: [{ sha: 'newsha1111111' }] },
+    newsha1111111: { sha: 'newsha1111111', commit: { message: 'first' }, author: { login: 'alice' }, html_url: 'https://example.com/1', parents: [{ sha: 'old-sha' }] },
+    'old-sha': { sha: 'old-sha', commit: { message: 'old' }, author: { login: 'carol' }, html_url: 'https://example.com/0', parents: [] },
+  };
+
   await withMockFetch(async (url, options = {}) => {
-    if (url.includes('/commits?')) {
-      return mockResponse(200, [
-        { sha: 'newsha2222222', commit: { message: 'second\nbody' }, author: { login: 'bob' }, html_url: 'https://example.com/2' },
-        { sha: 'newsha1111111', commit: { message: 'first' }, author: { login: 'alice' }, html_url: 'https://example.com/1' },
-        { sha: 'old-sha', commit: { message: 'old' }, author: { login: 'carol' }, html_url: 'https://example.com/0' },
-      ]);
+    const commitMatch = url.match(/\/commits\/([^/?]+)$/);
+    if (commitMatch && commitsBySha[commitMatch[1]]) {
+      return mockResponse(200, commitsBySha[commitMatch[1]]);
     }
     if (url.includes('/pulls?')) {
       return mockResponse(200, [
@@ -124,16 +127,59 @@ test('subsequent run reports new commits and merged PRs, and creates an issue', 
   assert.equal(state.lastMergedPr.number, 3);
 });
 
+test('merge commit collapses feature-branch commits via first-parent walk', async () => {
+  const statePath = tmpStatePath();
+  fs.writeFileSync(statePath, JSON.stringify({ lastCommitSha: 'old-sha', lastMergedPr: null }));
+
+  // "old-sha" is main's tip before the merge; "feature-2"/"feature-1" only exist on
+  // the merged-in branch and must not be walked, since parents[0] is the mainline.
+  const commitsBySha = {
+    main: {
+      sha: 'merge-sha',
+      commit: { message: 'Merge pull request #7 from me/feature-x' },
+      author: { login: 'bob' },
+      html_url: 'https://example.com/merge',
+      parents: [{ sha: 'old-sha' }, { sha: 'feature-2' }],
+    },
+    'old-sha': { sha: 'old-sha', commit: { message: 'old' }, author: { login: 'carol' }, html_url: 'https://example.com/0', parents: [] },
+  };
+
+  await withMockFetch(async (url) => {
+    const commitMatch = url.match(/\/commits\/([^/?]+)$/);
+    if (commitMatch && commitsBySha[commitMatch[1]]) {
+      return mockResponse(200, commitsBySha[commitMatch[1]]);
+    }
+    if (url.includes('/pulls?state=closed') && !url.includes('per_page=50&page')) {
+      return mockResponse(200, []);
+    }
+    throw new Error(`unexpected url ${url}`);
+  }, async () => {
+    const result = await run({
+      INPUT_UPSTREAM_REPO: 'octocat/Hello-World',
+      INPUT_GITHUB_TOKEN: '',
+      INPUT_STATE_PATH: statePath,
+      INPUT_NOTIFY_METHOD: 'none',
+      GITHUB_REPOSITORY: 'me/private-copy',
+    });
+
+    assert.equal(result.newCommits.length, 1);
+    assert.equal(result.newCommits[0].sha, 'merge-sha');
+  });
+});
+
 test('notify-method none skips notifications but still reports outputs', async () => {
   const statePath = tmpStatePath();
   fs.writeFileSync(statePath, JSON.stringify({ lastCommitSha: 'old-sha', lastMergedPr: null }));
 
+  const commitsBySha = {
+    main: { sha: 'new-sha', commit: { message: 'change' }, author: { login: 'bob' }, html_url: 'https://example.com/1', parents: [{ sha: 'old-sha' }] },
+    'old-sha': { sha: 'old-sha', commit: { message: 'old' }, author: { login: 'carol' }, html_url: 'https://example.com/0', parents: [] },
+  };
+
   await withMockFetch(async (url, options = {}) => {
-    if (url.includes('/commits?')) {
-      return mockResponse(200, [
-        { sha: 'new-sha', commit: { message: 'change' }, author: { login: 'bob' }, html_url: 'https://example.com/1' },
-        { sha: 'old-sha', commit: { message: 'old' }, author: { login: 'carol' }, html_url: 'https://example.com/0' },
-      ]);
+    const commitMatch = url.match(/\/commits\/([^/?]+)$/);
+    if (commitMatch && commitsBySha[commitMatch[1]]) {
+      return mockResponse(200, commitsBySha[commitMatch[1]]);
     }
     if (url.includes('/pulls?state=closed') && !url.includes('per_page=50&page')) {
       return mockResponse(200, []);

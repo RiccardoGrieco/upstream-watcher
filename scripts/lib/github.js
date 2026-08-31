@@ -59,32 +59,32 @@ function createClient(token) {
     return response.json();
   }
 
+  async function getCommit(repo, shaOrRef) {
+    return getJson(`/repos/${repo}/commits/${encodeURIComponent(shaOrRef)}`);
+  }
+
   /**
-   * Fetch commits for a branch, stopping once `untilSha` is reached or no more pages exist.
+   * Walk first-parent history from `branch` down to `untilSha`, mirroring `git log
+   * --first-parent` so merge commits are reported without re-listing every commit
+   * that was merged in from the other parent.
    * Returns commits newest-first, excluding `untilSha` itself.
    */
-  async function listCommitsSince(repo, branch, untilSha, { maxPages = 10, perPage = 100 } = {}) {
+  async function listCommitsSince(repo, branch, untilSha, { maxCommits = 1000 } = {}) {
     const collected = [];
-    let page = 1;
-    while (page <= maxPages) {
-      const commits = await getJson(
-        `/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=${perPage}&page=${page}`
-      );
-      if (!Array.isArray(commits) || commits.length === 0) {
+    let current = await getCommit(repo, branch);
+    while (current) {
+      if (untilSha && current.sha === untilSha) {
         break;
       }
-      let foundBoundary = false;
-      for (const commit of commits) {
-        if (untilSha && commit.sha === untilSha) {
-          foundBoundary = true;
-          break;
-        }
-        collected.push(commit);
-      }
-      if (foundBoundary || commits.length < perPage) {
+      collected.push(current);
+      if (collected.length >= maxCommits) {
         break;
       }
-      page += 1;
+      const parentSha = current.parents && current.parents[0] && current.parents[0].sha;
+      if (!parentSha) {
+        break;
+      }
+      current = await getCommit(repo, parentSha);
     }
     return collected;
   }
@@ -123,7 +123,7 @@ function createClient(token) {
   }
 
   async function getLatestCommitSha(repo, branch) {
-    const commit = await getJson(`/repos/${repo}/commits/${encodeURIComponent(branch)}`);
+    const commit = await getCommit(repo, branch);
     return commit.sha;
   }
 

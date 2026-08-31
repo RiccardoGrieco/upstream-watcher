@@ -23,8 +23,10 @@ on a schedule — which is exactly what this action does.
 - The action reads the last-seen commit SHA / merged PR from a small JSON state file
   **in your repo's checkout** (it does not check out any repo itself).
 - It queries the GitHub REST API for the upstream repo:
-  - `GET /repos/{upstream-repo}/commits?sha={branch}` for new commits (paginated
-    until the previously-seen SHA is reached).
+  - `GET /repos/{upstream-repo}/commits/{sha}` walked along first-parent history
+    (like `git log --first-parent`) from the branch tip down to the previously-seen
+    SHA, so a merged feature branch is reported as its merge commit rather than as
+    every individual commit it contained.
   - `GET /repos/{upstream-repo}/pulls?state=closed&sort=updated&direction=desc` for
     newly merged pull requests (filtered to `merged_at != null`, stopping once
     previously-seen PRs are reached).
