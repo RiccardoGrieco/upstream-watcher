@@ -71,6 +71,7 @@ jobs:
           issue-labels: ${{ inputs.issue-labels }}
 
       - name: Commit updated state file
+        if: steps.watch.outputs.has-updates == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

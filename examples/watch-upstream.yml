@@ -9,7 +9,7 @@ name: Watch upstream repository
 
 on:
   schedule:
-    - cron: "*/30 * * * *" # every 30 minutes
+    - cron: "0 0 * * 0" # every week
   workflow_dispatch:
 
 permissions:
@@ -45,6 +45,7 @@ jobs:
           echo "New merged PRs: ${{ steps.watch.outputs.new-merged-prs }}"
 
       - name: Commit updated state file
+        if: steps.watch.outputs.has-updates == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
